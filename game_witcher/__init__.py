@@ -11,7 +11,8 @@ from copy import deepcopy
 
 pygame.init()
 
-ASSET_DIRECTORY = os.path.dirname(__file__) + "/../"
+ASSET_DIRECTORY = os.path.dirname(__file__) + "/../assets/"
+print("ASSET_DIRECTORY", ASSET_DIRECTORY)
 
 
 class CharacterState(Enum):
@@ -80,7 +81,7 @@ class Character:
     animation_by_state: Dict[CharacterState, MirrorAnimation]
 
     def __init__(self, x, y, screen, ch, back, weight, height, asset_directory):
-        self.char = pygame.transform.scale(pygame.image.load(ch), (weight, height))
+        self.char = pygame.transform.scale(pygame.image.load(asset_directory + ch), (weight, height))
         self.count = 0
         self.delta = 0
         self.on = False
