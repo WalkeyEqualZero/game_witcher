@@ -12,6 +12,8 @@ from copy import deepcopy
 pygame.init()
 
 ASSET_DIRECTORY = os.path.dirname(__file__) + "/../assets/"
+ASSET_DIRECTORY_CHARACTER = os.path.dirname(__file__) + "/../assets/character/"
+ASSET_DIRECTORY_ENEMY = os.path.dirname(__file__) + "/../assets/enemy/"
 print("ASSET_DIRECTORY", ASSET_DIRECTORY)
 
 
@@ -26,6 +28,67 @@ class CharacterState(Enum):
 class CharacterDirection(Enum):
     left = 0
     right = 1
+
+
+class EnemyDirection(Enum):
+    left = 0
+    right = 1
+
+
+class EnemyState(Enum):
+    idle = 0
+    dead = 1
+    walk = 2
+    attack = 3
+
+
+class EnemyMirrorAnimation:
+    left: List[pygame.Surface]
+    right: List[pygame.Surface]
+
+    def __init__(self, animation: List[pygame.Surface]):
+        self.right = animation
+        self.left = list(map(lambda i: pygame.transform.flip(i, True, False), animation))
+
+
+class EnemyCounterAnimation:
+    def __init__(self, max_frame_cnt, max_animation_cnt, animation_end_function=None, whitelist_reset=None):
+        self._whitelist_reset = whitelist_reset
+        self._max_frame_cnt = max_frame_cnt
+        self._max_animation_cnt = max_animation_cnt
+        self._frame_cnt = 0
+        self._animation_cnt = 0
+        self._animation_end_function = animation_end_function
+
+    def access_reset(self, state):
+        return self._whitelist_reset is None or state in self._whitelist_reset
+
+    @property
+    def animation_cnt(self):
+        return self._animation_cnt
+
+    @property
+    def frame_cnt(self):
+        return self._frame_cnt
+
+    def duplicate(self):
+        new = deepcopy(self)
+        new._frame_cnt = 0
+        new._animation_cnt = 0
+
+        return new
+
+    def tick(self):
+        self._frame_cnt += 1
+        if self._frame_cnt >= self._max_frame_cnt:
+            self._frame_cnt = 0
+            self._animation_cnt += 1
+
+            if self._animation_cnt >= self._max_animation_cnt:
+                if self._animation_end_function is None:
+                    self._animation_cnt = 0
+                else:
+                    self._animation_end_function()
 
 
 class MirrorAnimation:
@@ -157,85 +220,149 @@ class Character:
         else:
             return False
 
+    def attack(self, enemy):
+        if self.char_rect.colliderect(enemy.rect):
+            return True
+        else:
+            return False
+
     def redraw_screen(self):
         self.win.blit(self.bg, (0, 0))
 
-        self.win.blit(
-            getattr(self.animation_by_state[self.state], self.direction.name)[self.counter_animation.animation_cnt],
-            (self.x, self.y)
-        )
+        if self.direction == CharacterDirection.left:
+            self.win.blit(
+                self.animation_by_state[self.state].left[self.counter_animation.animation_cnt],
+                (self.x, self.y)
+            )
+        else:
+            self.win.blit(
+                self.animation_by_state[self.state].right[self.counter_animation.animation_cnt],
+                (self.x, self.y)
+            )
+
         self.counter_animation.tick()
         self.char_rect = self.char.get_rect(topleft=(self.x, self.y))
 
-        pygame.display.update()
-
 
 class Enemy:
-    def __init__(self, x, y, weight, height, animi, anima, animw, animd, fpsi, fpsa, fpsw, fpsd, screen):
+    def __init__(self, x, y, weight, height, screen, asset_directory):
+        self.enemy = pygame.transform.scale(pygame.image.load(asset_directory + 'idle_0.png'), (weight, height))
         self.x = x
         self.y = y
         self.weight = weight
         self.height = height
         self.win = screen
         self.last_side = "left"
-        self.walk = False
-        self.attack = False
-        self.death = False
+        self.bg = None
+        self.def_bg = 'tamploin 2.0.png'
+        self.dead = False
         self.hp = 100
-        self.idle_animation = list(map(lambda i: pygame.transform.scale(pygame.image.load(i), (weight, height)), animi))
-        self.attack_animation = list(map(lambda a: pygame.transform.scale(pygame.image.load(a), (weight, height)), anima))
-        self.walk_animation = list(map(lambda w: pygame.transform.scale(pygame.image.load(w), (weight, height)), animw))
-        self.death_animation = list(map(lambda d: pygame.transform.scale(pygame.image.load(d), (weight, height)), animd))
-        self.idle_count = 0
-        self.attack_count = 0
-        self.walk_count = 0
-        self.death_count = 0
-        self.idle_fps = fpsi
-        self.attack_fps = fpsa
-        self.walk_fps = fpsw
-        self.death_fps = fpsd
-        self.idle_right = self.idle_animation
-        self.idle_left = list(map(lambda i: pygame.transform.flip(i, True, False), self.idle_animation))
-        self.attack_right = self.attack_animation
-        self.attack_left = list(map(lambda a: pygame.transform.flip(a, True, False), self.attack_animation))
-        self.walk_right = self.walk_animation
-        self.walk_left = list(map(lambda w: pygame.transform.flip(w, True, False), self.walk_animation))
-        self.death_right = self.death_animation
-        self.death_left = list(map(lambda d: pygame.transform.flip(d, True, False), self.death_animation))
-        self.col = pygame.Rect(0, 0, width, height)
-        self.col.topleft = (x, y)
+        self.rect = self.enemy.get_rect(topleft=(self.x, self.y))
 
-    def animation(self):
-        if self.idle_count + 1 >= self.idle_fps:
-            self.idle_count = 0
-        if self.death_count + 1 >= self.death_fps:
-            self.death_count = 0
+        self.animation_by_state = {
+            EnemyState.idle: EnemyMirrorAnimation(
+                pygame_load_image(0, 6, os.path.join(asset_directory, "idle_{}.png"), (weight, height))
+            ),
+            EnemyState.dead: EnemyMirrorAnimation(
+                pygame_load_image(0, 4, os.path.join(asset_directory, "idle_{}.png"), (weight, height))
+            )
+        }
 
-        if self.death:
-            if self.last_side == "right":
-                self.win.blit(self.death_right[self.death_count // (self.death_fps // len(self.death_animation))], (self.x, self.y))
-                self.walk_count = 0
-                self.idle_count = 0
-                self.death_count += 1
-                self.attack_count = 0
-            elif self.last_side == "left":
-                self.win.blit(self.death_left[self.death_count // (self.death_fps // len(self.death_animation))], (self.x, self.y))
-                self.walk_count = 0
-                self.idle_count = 0
-                self.death_count += 1
-                self.attack_count = 0
+        self.counter_animation_by_state = {
+            EnemyState.idle: EnemyCounterAnimation(7, 6),
+            EnemyState.dead: EnemyCounterAnimation(7, 4),
+        }
+
+        self.direction = EnemyDirection.right
+        self.state = EnemyState.idle
+        self.counter_animation = self.counter_animation_by_state[self.state].duplicate()
+
+    def set_state_force(self, state):
+        if self.state != state:
+            self.state = state
+            self.counter_animation = self.counter_animation_by_state[self.state].duplicate()
+
+    def set_state(self, state):
+        if self.counter_animation.access_reset(state):
+            self.set_state_force(state)
+            return True
         else:
-            if self.last_side == "right":
-                self.win.blit(self.idle_right[self.idle_count // (self.idle_fps // len(self.idle_animation))], (self.x, self.y))
-                self.walk_count = 0
-                self.idle_count += 1
-                self.attack_count = 0
-            elif self.last_side == "left":
-                self.win.blit(self.idle_left[self.idle_count // (self.idle_fps // len(self.idle_animation))], (self.x, self.y))
-                self.walk_count = 0
-                self.idle_count += 1
-                self.attack_count = 0
-        self.col.topleft = (self.x, self.y)
+            return False
+
+    def death(self, torf):
+        if torf:
+            return True
+
+    def redraw_screen(self):
+        if self.bg == self.def_bg:
+            if self.direction == EnemyDirection.left:
+                self.win.blit(
+                    self.animation_by_state[self.state].left[self.counter_animation.animation_cnt],
+                    (self.x, self.y)
+                )
+            else:
+                self.win.blit(
+                    self.animation_by_state[self.state].right[self.counter_animation.animation_cnt],
+                    (self.x, self.y)
+                )
+
+            self.counter_animation.tick()
+            self.rect = self.enemy.get_rect(topleft=(self.x, self.y))
+
+    #     self.idle_animation = list(map(lambda i: pygame.transform.scale(pygame.image.load(i), (weight, height)), animi))
+    #     self.attack_animation = list(map(lambda a: pygame.transform.scale(pygame.image.load(a), (weight, height)), anima))
+    #     self.walk_animation = list(map(lambda w: pygame.transform.scale(pygame.image.load(w), (weight, height)), animw))
+    #     self.death_animation = list(map(lambda d: pygame.transform.scale(pygame.image.load(d), (weight, height)), animd))
+    #     self.idle_count = 0
+    #     self.attack_count = 0
+    #     self.walk_count = 0
+    #     self.death_count = 0
+    #     self.idle_fps = fpsi
+    #     self.attack_fps = fpsa
+    #     self.walk_fps = fpsw
+    #     self.death_fps = fpsd
+    #     self.idle_right = self.idle_animation
+    #     self.idle_left = list(map(lambda i: pygame.transform.flip(i, True, False), self.idle_animation))
+    #     self.attack_right = self.attack_animation
+    #     self.attack_left = list(map(lambda a: pygame.transform.flip(a, True, False), self.attack_animation))
+    #     self.walk_right = self.walk_animation
+    #     self.walk_left = list(map(lambda w: pygame.transform.flip(w, True, False), self.walk_animation))
+    #     self.death_right = self.death_animation
+    #     self.death_left = list(map(lambda d: pygame.transform.flip(d, True, False), self.death_animation))
+    #     self.col = pygame.Rect(0, 0, width, height)
+    #     self.col.topleft = (x, y)
+    #
+    # def animation(self):
+    #     if self.idle_count + 1 >= self.idle_fps:
+    #         self.idle_count = 0
+    #     if self.death_count + 1 >= self.death_fps:
+    #         self.death_count = 0
+    #
+    #     if self.death:
+    #         if self.last_side == "right":
+    #             self.win.blit(self.death_right[self.death_count // (self.death_fps // len(self.death_animation))], (self.x, self.y))
+    #             self.walk_count = 0
+    #             self.idle_count = 0
+    #             self.death_count += 1
+    #             self.attack_count = 0
+    #         elif self.last_side == "left":
+    #             self.win.blit(self.death_left[self.death_count // (self.death_fps // len(self.death_animation))], (self.x, self.y))
+    #             self.walk_count = 0
+    #             self.idle_count = 0
+    #             self.death_count += 1
+    #             self.attack_count = 0
+    #     else:
+    #         if self.last_side == "right":
+    #             self.win.blit(self.idle_right[self.idle_count // (self.idle_fps // len(self.idle_animation))], (self.x, self.y))
+    #             self.walk_count = 0
+    #             self.idle_count += 1
+    #             self.attack_count = 0
+    #         elif self.last_side == "left":
+    #             self.win.blit(self.idle_left[self.idle_count // (self.idle_fps // len(self.idle_animation))], (self.x, self.y))
+    #             self.walk_count = 0
+    #             self.idle_count += 1
+    #             self.attack_count = 0
+    #     self.col.topleft = (self.x, self.y)
 
 
 class World:
@@ -264,13 +391,14 @@ class World:
             return 0
 
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.ERROR)
 
 win = pygame.display.set_mode((1012, 576))
 pygame.display.set_caption("The Witcher 4 Flat World")
 pygame.display.set_caption("The Witcher 4 Flat World")
 bg = pygame.image.load(ASSET_DIRECTORY + 'tamploin 2.0.png')
 bg = pygame.transform.scale(bg, (1012, 576))
+bgs_names = ['tamploin 2.0.png', 'menu.jpg', 'instructions.png']
 bgs = [pygame.image.load(ASSET_DIRECTORY+'tamploin 2.0.png'), pygame.image.load(ASSET_DIRECTORY + 'menu.jpg'), pygame.image.load(
     ASSET_DIRECTORY + 'instructions.png')]
 width = 0
@@ -278,13 +406,13 @@ clock = pygame.time.Clock()
 last = 2
 run = True
 
-char = Character(500, 360, win, 'idle_00.png', bg, 210, 210, ASSET_DIRECTORY)
+char = Character(500, 360, win, 'idle_00.png', bg, 210, 210, ASSET_DIRECTORY_CHARACTER)
+enem = Enemy(500, 255, 350, 280, win, ASSET_DIRECTORY_ENEMY)
 game = World(win, 210, 210)
 
 
 while run:
     clock.tick(56)
-
 
     pressed_attack = False
 
@@ -298,8 +426,10 @@ while run:
         logging.info(event)
 
     if pressed_attack:
+        enem.dead = enem.death(char.attack(enem))
+        if enem.dead:
+            enem.state = EnemyState.dead
         logging.info("key pressed attack.")
-
         if len(char.attack_last) < 3 and char.on is False:
             char.attack_last.append(datetime.now())
         char.on = True
@@ -333,16 +463,19 @@ while run:
                 char.walk_count = 0
 
     char.redraw_screen()
+    enem.redraw_screen()
     last_r = last + game.is_collided(char)
     char.bg = pygame.transform.scale(bgs[last_r], (1012, 576))
+    enem.bg = bgs_names[last_r]
     last = last_r
     if game.is_collided(char) == 1:
         char.x = -60
     elif game.is_collided(char) == -1:
-        char.x = 1000
+        char.x = 900
     else:
         game.right_rect = pygame.Rect(1100, 315, 20, game.char_y)
         game.left_rect = pygame.Rect(-100, 315, 20, game.char_y)
 
+    pygame.display.update()
 
 pygame.quit()
