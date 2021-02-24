@@ -94,14 +94,43 @@ class CounterAnimation:
                     self._animation_end_function()
 
 
+class RotateAnimation:
+    def __init__(self, eagle, steps):
+        self._eagle = eagle
+        self.steps = steps
+        self.cur_eagle = 0
+
+    @property
+    def eagle(self):
+        return self._eagle
+
+    def rotate(self):
+        self.cur_eagle = self._eagle
+
+    def tick(self):
+        self.cur_eagle -= 0.1 + self._eagle / self.steps
+        if self.cur_eagle <= 0:
+            self.cur_eagle = 0
+
+
+class StrictRotate:
+    def __init__(self, eagle):
+        self.cur_eagle = eagle
+
+    def tick(self):
+        pass
+
+
 class Character:
     animation_by_state: Dict[CharacterState, MirrorAnimation]
 
     def __init__(self, x, y, screen, ch, back, weight, height, asset_directory):
+        self.life = 15
         self.char = pygame.transform.scale(pygame.image.load(asset_directory + ch), (weight, height))
         self.count = 0
         self.delta = 0
         self.on = False
+        self.rotate = RotateAnimation(15.0, 7)
 
         self.animation_by_state = {
             CharacterState.attack: MirrorAnimation(
@@ -182,17 +211,15 @@ class Character:
 
     def redraw_screen(self):
         if self.direction == CharacterDirection.left:
-            self.win.blit(
-                self.animation_by_state[self.state].left[self.counter_animation.animation_cnt],
-                (self.x, self.y)
-            )
+            anim = self.animation_by_state[self.state].left[self.counter_animation.animation_cnt]
         else:
-            self.win.blit(
-                self.animation_by_state[self.state].right[self.counter_animation.animation_cnt],
-                (self.x, self.y)
-            )
+            anim = self.animation_by_state[self.state].right[self.counter_animation.animation_cnt]
+
+        anim = pygame.transform.rotate(anim, self.rotate.cur_eagle)
+        self.win.blit(anim, (self.x, self.y))
 
         self.counter_animation.tick()
+        self.rotate.tick()
         self.char_rect = self.char.get_rect(topleft=(self.x, self.y))
 
 
@@ -212,6 +239,7 @@ class Enemy:
         self.def_bg = 'instructions.png'
         self.dead = False
         self.rect = self.enemy.get_rect(topleft=(self.x, self.y))
+        self.rotate = RotateAnimation(15.0, 7)
 
         self.animation_by_state = {
             EnemyState.idle: MirrorAnimation(
@@ -258,17 +286,15 @@ class Enemy:
     def redraw_screen(self):
         if self.bg == self.def_bg:
             if self.direction == EnemyDirection.left:
-                self.win.blit(
-                    self.animation_by_state[self.state].left[self.counter_animation.animation_cnt],
-                    (self.x, self.y)
-                )
+                anim = self.animation_by_state[self.state].left[self.counter_animation.animation_cnt]
             else:
-                self.win.blit(
-                    self.animation_by_state[self.state].right[self.counter_animation.animation_cnt],
-                    (self.x, self.y)
-                )
+                anim = self.animation_by_state[self.state].right[self.counter_animation.animation_cnt]
+
+            anim = pygame.transform.rotate(anim, self.rotate.cur_eagle)
+            self.win.blit(anim, (self.x, self.y))
 
             self.counter_animation.tick()
+            self.rotate.tick()
             self.rect = self.enemy.get_rect(topleft=(self.x, self.y))
 
         else:
@@ -336,55 +362,62 @@ while run:
 
         logging.info(event)
 
-    if pressed_attack:
-        logging.info("key pressed attack.")
-        if char.state == CharacterState.idle:
-            if char.attack(enem):
-                enem.hp -= 35
-                if enem.hp <= 0:
-                    enem.set_state(EnemyState.dead)
-                    enem.dead = True
-                    logging.info("Death")
-            char.set_state(CharacterState.attack)
-        elif char.state == CharacterState.attack:
-            if char.attack(enem):
-                enem.hp -= 35
-                if enem.hp <= 0:
-                    enem.set_state(EnemyState.dead)
-                    enem.dead = True
-                    logging.info("Death")
-            char.set_state(CharacterState.attack2)
-        elif char.state == CharacterState.attack2:
-            if char.attack(enem):
-                enem.hp -= 35
-                if enem.hp <= 0:
-                    enem.set_state(EnemyState.dead)
-                    enem.dead = True
-                    logging.info("Death")
-            char.set_state(CharacterState.attack3)
-    else:
-        keys = pygame.key.get_pressed()
-
-        if keys[pygame.K_a] and char.x > char.vel - 200:
-            logging.info("key pressed walk left.")
-
-            if char.set_state(CharacterState.walk):
-                char.direction = CharacterDirection.left
-                char.x -= char.vel
-
-        elif keys[pygame.K_d] and char.x < 1100 - char.vel:
-            logging.info("key pressed walk right.")
-
-            if char.set_state(CharacterState.walk):
-                char.x += char.vel
-                char.direction = CharacterDirection.right
-
+    if char.life > 0:
+        if pressed_attack:
+            logging.info("key pressed attack.")
+            if char.state == CharacterState.idle:
+                if char.attack(enem):
+                    enem.hp -= 35
+                    enem.rotate.rotate()
+                    if enem.hp <= 0:
+                        enem.set_state(EnemyState.dead)
+                        enem.dead = True
+                        logging.info("Death")
+                char.set_state(CharacterState.attack)
+            elif char.state == CharacterState.attack:
+                if char.attack(enem):
+                    enem.hp -= 35
+                    enem.rotate.rotate()
+                    if enem.hp <= 0:
+                        enem.set_state(EnemyState.dead)
+                        enem.dead = True
+                        logging.info("Death")
+                char.set_state(CharacterState.attack2)
+            elif char.state == CharacterState.attack2:
+                if char.attack(enem):
+                    enem.hp -= 35
+                    enem.rotate.rotate()
+                    if enem.hp <= 0:
+                        enem.set_state(EnemyState.dead)
+                        enem.dead = True
+                        logging.info("Death")
+                char.set_state(CharacterState.attack3)
         else:
-            char.set_state(CharacterState.idle)
+            keys = pygame.key.get_pressed()
+
+            if keys[pygame.K_a] and char.x > char.vel - 200:
+                logging.info("key pressed walk left.")
+
+                if char.set_state(CharacterState.walk):
+                    char.direction = CharacterDirection.left
+                    char.x -= char.vel
+
+            elif keys[pygame.K_d] and char.x < 1100 - char.vel:
+                logging.info("key pressed walk right.")
+
+                if char.set_state(CharacterState.walk):
+                    char.x += char.vel
+                    char.direction = CharacterDirection.right
+
+            else:
+                char.set_state(CharacterState.idle)
 
     if not enem.dead:
         if abs(char.x - enem.x) <= 30 and enem.direction == EnemyDirection.left:
             enem.set_state(EnemyState.attack)
+            if char.rotate.cur_eagle < 0.1:
+                char.rotate.rotate()
+                char.life -= 1
 
         # elif char.x - enem.x >= 30 and enem.direction == EnemyDirection.right:
         #     enem.set_state(EnemyState.attack)
@@ -420,6 +453,17 @@ while run:
     else:
         game.right_rect = pygame.Rect(1100, 315, 20, game.char_y)
         game.left_rect = pygame.Rect(-100, 315, 20, game.char_y)
+
+    if enem.hp <= 0:
+        myfont = pygame.font.SysFont('Comic Sans MS', 100)
+        textsurface = myfont.render('Вы выграли', False, (255, 255, 255))
+        win.blit(textsurface, (400, 300))
+
+    if char.life <= 0:
+        char.rotate = StrictRotate(90)
+        myfont = pygame.font.SysFont('Comic Sans MS', 100)
+        textsurface = myfont.render('Вы проиграли', False, (255, 255, 255))
+        win.blit(textsurface, (400, 300))
 
     pygame.display.update()
 
