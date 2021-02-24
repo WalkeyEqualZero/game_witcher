@@ -23,6 +23,7 @@ class CharacterState(Enum):
     attack = 2
     attack2 = 3
     attack3 = 4
+    dead = 5
 
 
 class CharacterDirection(Enum):
@@ -117,6 +118,9 @@ class StrictRotate:
     def __init__(self, eagle):
         self.cur_eagle = eagle
 
+    def rotate(self):
+        pass
+
     def tick(self):
         pass
 
@@ -150,6 +154,10 @@ class Character:
             CharacterState.walk: MirrorAnimation(
                pygame_load_image(0, 8, os.path.join(asset_directory, "run_{}.png"), (weight, height))
             ),
+            CharacterState.dead: MirrorAnimation(
+                pygame_load_image(0, 14, os.path.join(asset_directory, "death_{}.png"), (weight, height))
+            ),
+
         }
         self.animation_screen_state = 0
 
@@ -171,6 +179,7 @@ class Character:
             ),
             CharacterState.idle: CounterAnimation(4, 15),
             CharacterState.walk: CounterAnimation(5, 8),
+            CharacterState.dead: CounterAnimation(5, 14, freeze_on_end=True),
         }
 
         self.mirror_char = pygame.transform.flip(self.char, True, False)
@@ -335,14 +344,14 @@ pygame.display.set_caption("The Witcher 4 Flat World")
 bg = pygame.image.load(ASSET_DIRECTORY + 'instructions.png')
 bg = pygame.transform.scale(bg, (1012, 576))
 bgs_names = ['tamploin 2.0.png', 'menu.jpg', 'instructions.png']
-bgs = [pygame.image.load(ASSET_DIRECTORY+'tamploin 2.0.png'), pygame.image.load(ASSET_DIRECTORY + 'menu.jpg'), pygame.image.load(
-    ASSET_DIRECTORY + 'instructions.png')]
+bgs = [pygame.image.load(ASSET_DIRECTORY + 'menu.jpg'), pygame.image.load(
+    ASSET_DIRECTORY + 'instructions.png'), pygame.image.load(ASSET_DIRECTORY+'tamploin 2.0.png'),]
 width = 0
 clock = pygame.time.Clock()
 last = 2
 run = True
 
-char = Character(500, 360, win, 'idle_00.png', bg, 210, 210, ASSET_DIRECTORY_CHARACTER)
+char = Character(100, 360, win, 'idle_00.png', bg, 210, 210, ASSET_DIRECTORY_CHARACTER)
 enem = Enemy(500, 255, 350, 280, win, ASSET_DIRECTORY_ENEMY)
 game = World(win, 210, 210)
 
@@ -412,12 +421,17 @@ while run:
             else:
                 char.set_state(CharacterState.idle)
 
-    if not enem.dead:
+    if enem.dead:
+        enem.set_state(EnemyState.dead)
+    else:
         if abs(char.x - enem.x) <= 30 and enem.direction == EnemyDirection.left:
-            enem.set_state(EnemyState.attack)
-            if char.rotate.cur_eagle < 0.1:
-                char.rotate.rotate()
-                char.life -= 1
+            if char.life > 0:
+                enem.set_state(EnemyState.attack)
+                if char.rotate.cur_eagle < 0.1:
+                    char.rotate.rotate()
+                    char.life -= 1
+            else:
+                enem.set_state(EnemyState.idle)
 
         # elif char.x - enem.x >= 30 and enem.direction == EnemyDirection.right:
         #     enem.set_state(EnemyState.attack)
@@ -460,7 +474,8 @@ while run:
         win.blit(textsurface, (400, 300))
 
     if char.life <= 0:
-        char.rotate = StrictRotate(90)
+        char.set_state_force(CharacterState.dead)
+        char.rotate = StrictRotate(0)
         myfont = pygame.font.SysFont('Comic Sans MS', 100)
         textsurface = myfont.render('Вы проиграли', False, (255, 255, 255))
         win.blit(textsurface, (400, 300))
