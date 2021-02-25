@@ -432,10 +432,12 @@ class World:
             logging.info('tavern')
             self.in_tavern = False
             character.y = 360
+            character.x = 720
             return 2
         else:
             self.in_tavern = False
             character.y = 360
+            character.x = 720
             return 2
 
 
@@ -468,7 +470,6 @@ while run:
     clock.tick(56)
     win.blit(bg, (0, 0))
     king.redraw_screen()
-
     pressed_attack = False
     space = False
 
@@ -512,11 +513,15 @@ while run:
         if n_text % 2 == 0:
             myfont = pygame.font.Font(ASSET_DIRECTORY + 'pixel.ttf', 20)
             textsurface = myfont.render(king.text[king.n_text], False, (0, 0, 0))
+            textsurface_2 = myfont.render('Король:', False, (0, 0, 0))
             win.blit(textsurface, (150, 85))
+            win.blit(textsurface_2, (150, 35))
         elif n_text % 2 != 0:
             myfont = pygame.font.Font(ASSET_DIRECTORY + 'pixel.ttf', 20)
             textsurface = myfont.render(char.text[char.n_text], False, (0, 0, 0))
+            textsurface_2 = myfont.render('Геральт:', False, (0, 0, 0))
             win.blit(textsurface, (150, 85))
+            win.blit(textsurface_2, (150, 35))
 
     elif char.quest_2 and char.life > 0:
         keir.win.blit(pygame.transform.scale(pygame.image.load(ASSET_DIRECTORY + 'panel.png'), (900, 300)), (56, -50))
@@ -530,11 +535,15 @@ while run:
         if n_text % 2 == 0:
             myfont = pygame.font.Font(ASSET_DIRECTORY + 'pixel.ttf', 20)
             textsurface = myfont.render(char.text_2[char.n_text], False, (0, 0, 0))
+            textsurface_2 = myfont.render('Геральт:', False, (0, 0, 0))
             win.blit(textsurface, (150, 85))
+            win.blit(textsurface_2, (150, 35))
         elif n_text % 2 != 0:
             myfont = pygame.font.Font(ASSET_DIRECTORY + 'pixel.ttf', 20)
             textsurface = myfont.render(keir.text[keir.n_text], False, (0, 0, 0))
+            textsurface_2 = myfont.render('Кейр:', False, (0, 0, 0))
             win.blit(textsurface, (150, 85))
+            win.blit(textsurface_2, (150, 35))
 
     elif char.life > 0:
         if pressed_attack:
