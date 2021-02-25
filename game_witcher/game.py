@@ -14,6 +14,8 @@ pygame.init()
 ASSET_DIRECTORY = os.path.dirname(__file__) + "/../assets/"
 ASSET_DIRECTORY_CHARACTER = os.path.dirname(__file__) + "/../assets/character/"
 ASSET_DIRECTORY_ENEMY = os.path.dirname(__file__) + "/../assets/enemy/"
+ASSET_DIRECTORY_KEIR = os.path.dirname(__file__) + "/../assets/keir/"
+ASSET_DIRECTORY_KING = os.path.dirname(__file__) + "/../assets/king/"
 print("ASSET_DIRECTORY", ASSET_DIRECTORY)
 
 
@@ -125,6 +127,71 @@ class StrictRotate:
         pass
 
 
+class Keir:
+    def __init__(self, x, y, screen, weight, height, asset_directory):
+        self.keir_sprite = pygame.transform.scale(pygame.image.load(asset_directory + 'barkeep_00.png'), (weight, height))
+        self.rect = self.keir_sprite.get_rect(topleft=(-1000, -1000))
+        self.win = screen
+        self.x = x
+        self.y = y
+        self.bg = None
+        self.default = 'tavern.png'
+        self.show_text = False
+        self.showed = False
+        self.n_text = 0
+        self.text = ['Приветствую тебя ведьмак. Какими судьбами ты здесь?',
+                     'Очень высокий и сильный, однако медлительный.',
+                     'Удачи!']
+
+        self.animation_by_state = MirrorAnimation(pygame_load_image
+                                                  (0, 5, os.path.join(asset_directory, "barkeep_{}.png"),
+                                                   (weight, height), max_number_len=2)),
+        self.counter_animation_by_state = CounterAnimation(10, 5)
+
+        self.counter_animation = self.counter_animation_by_state.duplicate()
+
+    def redraw_screen(self):
+        if self.default == self.bg:
+            self.rect = self.keir_sprite.get_rect(topleft=(self.x, self.y))
+            anim = self.animation_by_state[0].right[self.counter_animation.animation_cnt]
+            self.win.blit(anim, (self.x, self.y))
+
+            self.counter_animation.tick()
+        else:
+            self.rect = self.keir_sprite.get_rect(topleft=(-1000, -1000))
+
+
+class King:
+    def __init__(self, x, y, screen, weight, height, asset_directory):
+        self.king_sprite = pygame.transform.scale(pygame.image.load(asset_directory + 'king_00.png'), (weight, height))
+        self.rect = self.king_sprite.get_rect(topleft=(x, y))
+        self.win = screen
+        self.x = x
+        self.y = y
+        self.bg = None
+        self.default = 'Castle_5.png'
+        self.show_text = False
+        self.showed = False
+        self.n_text = 0
+        self.text = ['Геральт у меня к тебе есть задание.',
+                     'С демоном, последнее время он нападает на людей.',
+                     'Зайди в бар к Кейру он может знать о демоне.']
+
+        self.animation_by_state = MirrorAnimation(pygame_load_image
+                                                  (0, 17, os.path.join(asset_directory, "king_{}.png"),
+                                                   (weight, height), max_number_len=2)),
+        self.counter_animation_by_state = CounterAnimation(5, 17)
+
+        self.counter_animation = self.counter_animation_by_state.duplicate()
+
+    def redraw_screen(self):
+        if self.default == self.bg:
+            anim = self.animation_by_state[0].right[self.counter_animation.animation_cnt]
+            self.win.blit(anim, (self.x, self.y))
+
+            self.counter_animation.tick()
+
+
 class Character:
     animation_by_state: Dict[CharacterState, MirrorAnimation]
 
@@ -134,7 +201,16 @@ class Character:
         self.count = 0
         self.delta = 0
         self.on = False
+        self.quest = False
+        self.quest_2 = False
         self.rotate = RotateAnimation(15.0, 7)
+        self.n_text = 0
+        self.text = ['С кем на этот раз надо разобраться?',
+                     'У кого я могу получить больше информации о нём?',
+                     'Помните, мои услуги не дешёвые.']
+
+        self.text_2 = ['Здравствуй Кейр, мне нужно разузнать о демоне.',
+                       'Спасибо тебе за помощь.']
 
         self.animation_by_state = {
             CharacterState.attack: MirrorAnimation(
@@ -185,7 +261,6 @@ class Character:
         self.mirror_char = pygame.transform.flip(self.char, True, False)
         self.x = x
         self.y = y
-        self.last_key = "right"
         self.char_rect = self.char.get_rect(topleft=(x, y))
         self.win = screen
         self.attack_last = []
@@ -194,7 +269,7 @@ class Character:
         self.torf = False
         self.last_attack = None
 
-        self.direction = CharacterDirection.right
+        self.direction = CharacterDirection.left
         self.state = CharacterState.idle
         self.counter_animation = self.counter_animation_by_state[self.state].duplicate()
 
@@ -224,7 +299,7 @@ class Character:
         else:
             anim = self.animation_by_state[self.state].right[self.counter_animation.animation_cnt]
 
-        anim = pygame.transform.rotate(anim, self.rotate.cur_eagle)
+        # anim = pygame.transform.rotate(anim, self.rotate.cur_eagle)
         self.win.blit(anim, (self.x, self.y))
 
         self.counter_animation.tick()
@@ -238,6 +313,7 @@ class Enemy:
         self.x = x
         self.y = y
         self.weight = weight
+        self.quest = False
         self.height = height
         self.win = screen
         self.directory = asset_directory
@@ -245,7 +321,7 @@ class Enemy:
         self.hp = 100
         self.bg = None
         self.vel = 2
-        self.def_bg = 'instructions.png'
+        self.def_bg = 'tamploin 2.0.png'
         self.dead = False
         self.rect = self.enemy.get_rect(topleft=(self.x, self.y))
         self.rotate = RotateAnimation(15.0, 7)
@@ -293,17 +369,17 @@ class Enemy:
             return False
 
     def redraw_screen(self):
-        if self.bg == self.def_bg:
+        if self.bg == self.def_bg and self.quest:
             if self.direction == EnemyDirection.left:
                 anim = self.animation_by_state[self.state].left[self.counter_animation.animation_cnt]
             else:
                 anim = self.animation_by_state[self.state].right[self.counter_animation.animation_cnt]
 
-            anim = pygame.transform.rotate(anim, self.rotate.cur_eagle)
+            # anim = pygame.transform.rotate(anim, self.rotate.cur_eagle)
             self.win.blit(anim, (self.x, self.y))
 
             self.counter_animation.tick()
-            self.rotate.tick()
+            # self.rotate.tick()
             self.rect = self.enemy.get_rect(topleft=(self.x, self.y))
 
         else:
@@ -311,29 +387,56 @@ class Enemy:
 
 
 class World:
-    def __init__(self, screen, char_x, char_y):
+    def __init__(self, screen, char_x, char_y, bg):
         self.last_tp = None
+        self.bg = bg
+        self.def_bg = 'tamploin 2.0.png'
         self.char_x = char_x
         self.char_y = char_y
         self.screen = screen
+        self.tavern_rect = pygame.Rect(900, 315, 20, char_y)
         self.right_rect = pygame.Rect(1100, 315, 20, char_y)
         self.left_rect = pygame.Rect(-100, 315, 20, char_y)
+        self.in_tavern = False
 
-    def is_collided(self, character):
-        if self.last_tp == "right" and self.left_rect.colliderect(character.char_rect):
-            return 0
-        elif self.last_tp == "left" and self.right_rect.colliderect(character.char_rect):
-            return 0
+    def is_collided(self, character, last):
+        if not self.in_tavern:
+            if self.last_tp == "right" and self.left_rect.colliderect(character.char_rect):
+                return 0
+            elif self.last_tp == "left" and self.right_rect.colliderect(character.char_rect):
+                return 0
+            else:
+                self.last_tp = None
+            if self.right_rect.colliderect(character.char_rect) and last < 2:
+                self.last_tp = "right"
+                character.x = -60
+                return 1
+            elif self.left_rect.colliderect(character.char_rect) and last != 0:
+                self.last_tp = "left"
+                character.x = 900
+                return -1
+            else:
+                self.right_rect = pygame.Rect(1100, 315, 20, game.char_y)
+                self.left_rect = pygame.Rect(-100, 315, 20, game.char_y)
+                return 0
         else:
-            self.last_tp = None
-        if self.right_rect.colliderect(character.char_rect):
-            self.last_tp = "right"
-            return 1
-        elif self.left_rect.colliderect(character.char_rect):
-            self.last_tp = "left"
-            return -1
-        else:
             return 0
+
+    def tavern(self, character):
+        if self.tavern_rect.colliderect(character.char_rect) and self.bg == self.def_bg and not self.in_tavern:
+            logging.info('tavern')
+            self.in_tavern = True
+            character.y = 290
+            return 3
+        elif self.tavern_rect.colliderect(character.char_rect) and self.bg == 'tavern.png' and self.in_tavern:
+            logging.info('tavern')
+            self.in_tavern = False
+            character.y = 360
+            return 2
+        else:
+            self.in_tavern = False
+            character.y = 360
+            return 2
 
 
 logging.basicConfig(level=logging.DEBUG)
@@ -341,26 +444,33 @@ logging.basicConfig(level=logging.DEBUG)
 win = pygame.display.set_mode((1012, 576))
 pygame.display.set_caption("The Witcher 4 Flat World")
 pygame.display.set_caption("The Witcher 4 Flat World")
-bg = pygame.image.load(ASSET_DIRECTORY + 'instructions.png')
+bg = pygame.image.load(ASSET_DIRECTORY + 'Castle_5.png')
 bg = pygame.transform.scale(bg, (1012, 576))
-bgs_names = ['tamploin 2.0.png', 'menu.jpg', 'instructions.png']
-bgs = [pygame.image.load(ASSET_DIRECTORY + 'menu.jpg'), pygame.image.load(
-    ASSET_DIRECTORY + 'instructions.png'), pygame.image.load(ASSET_DIRECTORY+'tamploin 2.0.png'),]
+bgs_names = ['Castle_5.png', 'menu.jpg', 'tamploin 2.0.png', 'tavern.png']
+bgs = [pygame.image.load(ASSET_DIRECTORY + 'Castle_5.png'), pygame.image.load(
+    ASSET_DIRECTORY + 'Forest.png'), pygame.transform.scale(pygame.image.load(ASSET_DIRECTORY+'tamploin 2.0.png'), (1012, 576)), pygame.image.load(ASSET_DIRECTORY + 'tavern_3.png')]
 width = 0
 clock = pygame.time.Clock()
-last = 2
+last = 0
 run = True
-
-char = Character(100, 360, win, 'idle_00.png', bg, 210, 210, ASSET_DIRECTORY_CHARACTER)
+last_r = 0
+end = False
+king = King(100, 285, win, 370, 370, ASSET_DIRECTORY_KING)
+char = Character(450, 360, win, 'idle_00.png', bg, 210, 210, ASSET_DIRECTORY_CHARACTER)
 enem = Enemy(500, 255, 350, 280, win, ASSET_DIRECTORY_ENEMY)
-game = World(win, 210, 210)
-
+keir = Keir(400, 310, win, 128, 128, ASSET_DIRECTORY_KEIR)
+game = World(win, 210, 210, bg)
+n_text = 2
+pygame.mixer.music.load(ASSET_DIRECTORY + 'Kaer Morhen.mp3')
+pygame.mixer.music.play()
 
 while run:
     clock.tick(56)
     win.blit(bg, (0, 0))
+    king.redraw_screen()
 
     pressed_attack = False
+    space = False
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -369,9 +479,64 @@ while run:
         if event.type == pygame.KEYDOWN and event.unicode == 'u':
             pressed_attack = True
 
+        if event.type == pygame.KEYDOWN and event.unicode == 'q':
+            if bgs_names[last] == 'tamploin 2.0.png' or bgs_names[last] == 'tavern.png':
+                last = game.tavern(char)
+
+        if event.type == pygame.KEYDOWN and event.unicode == ' ':
+            if char.quest:
+                if n_text % 2 == 0:
+                    king.n_text += 1
+                if n_text % 2 != 0:
+                    char.n_text += 1
+                n_text += 1
+            elif char.quest_2:
+                if n_text % 2 == 0:
+                    char.n_text += 1
+                if n_text % 2 != 0:
+                    keir.n_text += 1
+                n_text += 1
         logging.info(event)
 
-    if char.life > 0:
+    if end:
+        char.set_state(CharacterState.idle)
+    elif char.quest and char.life > 0:
+        king.win.blit(pygame.transform.scale(pygame.image.load(ASSET_DIRECTORY + 'panel.png'), (900, 300)), (56, -50))
+        char.set_state(CharacterState.idle)
+        keys = pygame.key.get_pressed()
+        if n_text == 7:
+            n_text = 1
+            char.n_text = 0
+            king.showed = True
+            char.quest = False
+        if n_text % 2 == 0:
+            myfont = pygame.font.Font(ASSET_DIRECTORY + 'pixel.ttf', 20)
+            textsurface = myfont.render(king.text[king.n_text], False, (0, 0, 0))
+            win.blit(textsurface, (150, 85))
+        elif n_text % 2 != 0:
+            myfont = pygame.font.Font(ASSET_DIRECTORY + 'pixel.ttf', 20)
+            textsurface = myfont.render(char.text[char.n_text], False, (0, 0, 0))
+            win.blit(textsurface, (150, 85))
+
+    elif char.quest_2 and char.life > 0:
+        keir.win.blit(pygame.transform.scale(pygame.image.load(ASSET_DIRECTORY + 'panel.png'), (900, 300)), (56, -50))
+        char.set_state(CharacterState.idle)
+        keys = pygame.key.get_pressed()
+        print(n_text)
+        if n_text == 5:
+            keir.showed = True
+            char.quest_2 = False
+            enem.quest = True
+        if n_text % 2 == 0:
+            myfont = pygame.font.Font(ASSET_DIRECTORY + 'pixel.ttf', 20)
+            textsurface = myfont.render(char.text_2[char.n_text], False, (0, 0, 0))
+            win.blit(textsurface, (150, 85))
+        elif n_text % 2 != 0:
+            myfont = pygame.font.Font(ASSET_DIRECTORY + 'pixel.ttf', 20)
+            textsurface = myfont.render(keir.text[keir.n_text], False, (0, 0, 0))
+            win.blit(textsurface, (150, 85))
+
+    elif char.life > 0:
         if pressed_attack:
             logging.info("key pressed attack.")
             if char.state == CharacterState.idle:
@@ -423,7 +588,7 @@ while run:
 
     if enem.dead:
         enem.set_state(EnemyState.dead)
-    else:
+    elif enem.bg == enem.def_bg and enem.quest:
         if abs(char.x - enem.x) <= 30 and enem.direction == EnemyDirection.left:
             if char.life > 0:
                 enem.set_state(EnemyState.attack)
@@ -454,31 +619,37 @@ while run:
         else:
             enem.set_state(EnemyState.idle)
 
+    if king.rect.colliderect(char.char_rect) and not king.showed:
+        char.quest = True
+
+    if keir.rect.colliderect(char.char_rect) and not keir.showed:
+        char.quest_2 = True
+
     enem.redraw_screen()
+    keir.redraw_screen()
     char.redraw_screen()
-    last_r = last + game.is_collided(char)
-    bg = pygame.transform.scale(bgs[last_r], (1012, 576))
+    last_r = last + game.is_collided(char, last_r)
+    bg = bgs[last_r]
     enem.bg = bgs_names[last_r]
+    king.bg = bgs_names[last_r]
+    game.bg = bgs_names[last_r]
+    keir.bg = bgs_names[last_r]
+    # if game.in_tavern:
+    #     win.blit(pygame.image.load(ASSET_DIRECTORY + 'tavern_tree.png'), (0, 0))
     last = last_r
-    if game.is_collided(char) == 1:
-        char.x = -60
-    elif game.is_collided(char) == -1:
-        char.x = 900
-    else:
-        game.right_rect = pygame.Rect(1100, 315, 20, game.char_y)
-        game.left_rect = pygame.Rect(-100, 315, 20, game.char_y)
 
     if enem.hp <= 0:
-        myfont = pygame.font.SysFont('Comic Sans MS', 100)
-        textsurface = myfont.render('Вы выграли', False, (255, 255, 255))
-        win.blit(textsurface, (400, 300))
+        myfont = pygame.font.Font(ASSET_DIRECTORY + 'pixel.ttf', 100)
+        textsurface = myfont.render('Конец', False, (255, 255, 255))
+        win.blit(textsurface, (350, 200))
+        end = True
 
     if char.life <= 0:
         char.set_state_force(CharacterState.dead)
         char.rotate = StrictRotate(0)
-        myfont = pygame.font.SysFont('Comic Sans MS', 100)
+        myfont = pygame.font.Font(ASSET_DIRECTORY + 'pixel.ttf', 100)
         textsurface = myfont.render('Вы проиграли', False, (255, 255, 255))
-        win.blit(textsurface, (400, 300))
+        win.blit(textsurface, (150, 200))
 
     pygame.display.update()
 
