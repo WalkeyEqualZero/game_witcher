@@ -1,0 +1,7 @@
+<RCC>
+  <qresource prefix="ing">
+    <file>assets/main_menu.png</file>
+    <file>assets/menu.png</file>
+    <file>assets/menu.jpg</file>
+  </qresource>
+</RCC>
